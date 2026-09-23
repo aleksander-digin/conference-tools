@@ -64,7 +64,7 @@ test("store inserts a submission so it can be retrieved", async (t) => {
     const got = await store.get(sample.messageId);
     assert.equal(got?.name, "Aleksander Bang-Larsen");
   });
-  if (!ran) t.skip("MySQL is not running (start with devenv up)");
+  if (!ran) t.skip("MySQL is not running (start with start-mysql)");
 });
 
 test("store does not insert the same Message-ID twice", async (t) => {
@@ -76,5 +76,5 @@ test("store does not insert the same Message-ID twice", async (t) => {
     assert.equal(again.inserted, false);
     assert.equal(again.submission.name, "Aleksander Bang-Larsen");
   });
-  if (!ran) t.skip("MySQL is not running (start with devenv up)");
+  if (!ran) t.skip("MySQL is not running (start with start-mysql)");
 });

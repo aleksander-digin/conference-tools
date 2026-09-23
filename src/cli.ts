@@ -18,7 +18,7 @@ program
   .command("ingest")
   .description("Fetch Squarespace form mail from the Processed IMAP folder and upsert into MySQL")
   .option("--database <url>", "mysql:// URL (default DATABASE_URL, the hosted database)")
-  .option("--local", "Write to the devenv test database (TEST_DATABASE_URL)")
+  .option("--local", "Write to the local test database (TEST_DATABASE_URL)")
   .action(async (opts: Record<string, unknown>) => {
     const dbUrl =
       opts.database !== undefined

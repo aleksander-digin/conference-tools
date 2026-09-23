@@ -13,7 +13,7 @@ export function loadDatabaseUrl(): string {
   return url;
 }
 
-/** devenv MariaDB. Tests and `ingest --local` use this, never the hosted URL. */
+/** Local flake MariaDB. Tests and `ingest --local` use this, never the hosted URL. */
 export function loadTestDatabaseUrl(): string {
   return env("TEST_DATABASE_URL") ?? LOCAL_TEST_URL;
 }

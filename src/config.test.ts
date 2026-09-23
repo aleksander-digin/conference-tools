@@ -13,7 +13,7 @@ test("loadDatabaseUrl requires hosted DATABASE_URL", () => {
   }
 });
 
-test("loadTestDatabaseUrl defaults to the devenv test database", () => {
+test("loadTestDatabaseUrl defaults to the local test database", () => {
   const prev = process.env.TEST_DATABASE_URL;
   delete process.env.TEST_DATABASE_URL;
   try {
