@@ -18,24 +18,15 @@
       nixosModules.ingest = import ./nixos/ingest.nix;
       nixosModules.default = self.nixosModules.ingest;
 
-      devShells = forEachSystem (
-        pkgs:
-        let
-          mysql = pkgs.callPackage ./nix/mysql.nix { };
-        in
-        {
-          default = pkgs.mkShell {
-            packages = [
-              pkgs.nodejs
-              pkgs.pnpm
-              pkgs.typescript
-              pkgs.mariadb
-              mysql.start-mysql
-              mysql.setup-db
-            ];
-            TEST_DATABASE_URL = "mysql://conference_tools_test:conference_tools_test@127.0.0.1:3306/conference_tools_test";
-          };
-        }
-      );
+      devShells = forEachSystem (pkgs: {
+        default = pkgs.mkShell {
+          # Local `pnpm ingest` writes to submissions_test. Prod is NixOS / GHA with --prod.
+          packages = [
+            pkgs.nodejs
+            pkgs.pnpm
+            pkgs.typescript
+          ];
+        };
+      });
     };
 }

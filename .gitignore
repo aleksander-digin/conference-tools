@@ -2,10 +2,8 @@ node_modules/
 .env
 .DS_Store
 
-# Local flake MariaDB
+# Leftover local MariaDB / devenv state
 .mysql-data/
-
-# Leftover devenv state
 .devenv*
 devenv.local.nix
 devenv.local.yaml
