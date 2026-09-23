@@ -1,0 +1,39 @@
+# Temporary stand-in until the NixOS systemd timer is the runner.
+# GitHub can delay or skip scheduled jobs; do not treat this as the long-term path.
+#
+# Repo secrets: DATABASE_URL, IMAP_USER, IMAP_PASS
+# Optional repo variables: IMAP_HOST, IMAP_PORT, IMAP_FOLDER
+
+name: ingest
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm ingest
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          IMAP_HOST: ${{ vars.IMAP_HOST || 'imap.zoho.eu' }}
+          IMAP_PORT: ${{ vars.IMAP_PORT || '993' }}
+          IMAP_USER: ${{ secrets.IMAP_USER }}
+          IMAP_PASS: ${{ secrets.IMAP_PASS }}
+          IMAP_FOLDER: ${{ vars.IMAP_FOLDER || 'Processed' }}
