@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { config as loadEnv } from "dotenv";
 import mysql from "mysql2/promise";
-import { loadTestDatabaseUrl } from "./config.ts";
-import { openStore } from "./store.ts";
+import { loadDatabaseUrl } from "./config.ts";
+import { openStore, STORE_TABLES } from "./store.ts";
 import type { SquarespaceSubmission } from "./squarespace.ts";
 
-const dbUrl = loadTestDatabaseUrl();
+loadEnv({ quiet: true });
 
 const sample: SquarespaceSubmission = {
   messageId: "<store-test-da1a022abbc546ebbef100debb0d074a@squarespace.info>",
@@ -24,23 +25,34 @@ const sample: SquarespaceSubmission = {
   },
 };
 
+function databaseUrl(): string | undefined {
+  try {
+    return loadDatabaseUrl();
+  } catch {
+    return undefined;
+  }
+}
+
 async function withStore(run: (store: Awaited<ReturnType<typeof openStore>>) => Promise<void>) {
+  const dbUrl = databaseUrl();
+  if (!dbUrl) return;
   let store: Awaited<ReturnType<typeof openStore>>;
   try {
-    store = await openStore(dbUrl);
+    store = await openStore(dbUrl, { table: STORE_TABLES.test });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (/ECONNREFUSED|ENOTFOUND|connect/.test(message)) {
+    if (/ECONNREFUSED|ENOTFOUND|connect|Access denied/.test(message)) {
       return;
     }
     throw err;
   }
+  assert.equal(store.table, STORE_TABLES.test);
   try {
     await run(store);
   } finally {
     const conn = await mysql.createConnection(dbUrl);
     try {
-      await conn.query("DELETE FROM submissions WHERE message_id LIKE ?", ["<store-test-%"]);
+      await conn.query(`DELETE FROM ${STORE_TABLES.test} WHERE message_id LIKE ?`, ["<store-test-%"]);
     } finally {
       await conn.end();
       await store.close();
@@ -52,7 +64,7 @@ test("openStore rejects non-mysql URLs", async () => {
   await assert.rejects(() => openStore("sqlite:data/inbox.sqlite"), /mysql:\/\//);
 });
 
-test("store inserts a submission so it can be retrieved", async (t) => {
+test("store inserts a submission into submissions_test", async (t) => {
   let ran = false;
   await withStore(async (store) => {
     ran = true;
@@ -64,7 +76,7 @@ test("store inserts a submission so it can be retrieved", async (t) => {
     const got = await store.get(sample.messageId);
     assert.equal(got?.name, "Aleksander Bang-Larsen");
   });
-  if (!ran) t.skip("MySQL is not running (start with start-mysql)");
+  if (!ran) t.skip("DATABASE_URL is not set or the hosted MySQL is unreachable");
 });
 
 test("store does not insert the same Message-ID twice", async (t) => {
@@ -76,5 +88,5 @@ test("store does not insert the same Message-ID twice", async (t) => {
     assert.equal(again.inserted, false);
     assert.equal(again.submission.name, "Aleksander Bang-Larsen");
   });
-  if (!ran) t.skip("MySQL is not running (start with start-mysql)");
+  if (!ran) t.skip("DATABASE_URL is not set or the hosted MySQL is unreachable");
 });

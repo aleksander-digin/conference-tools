@@ -15,7 +15,8 @@
 #
 # `environmentFile` uses the same keys as .env.example (DATABASE_URL, IMAP_*).
 # Set `package` to a derivation that ships `bin/conference-tools`, or leave
-# it unset and run `pnpm ingest` from a checkout in `workingDirectory`.
+# it unset and run `pnpm ingest --prod` from a checkout in `workingDirectory`.
+# `--prod` writes to `submissions`. Flake/local ingest defaults to `submissions_test`.
 
 let
   cfg = config.services.conference-tools.ingest;
@@ -41,8 +42,8 @@ in
       default = null;
       description = ''
         Package that provides bin/conference-tools. When set, the service
-        runs `conference-tools ingest`. Otherwise workingDirectory is
-        required and the service runs `pnpm ingest` there.
+        runs `conference-tools ingest --prod`. Otherwise workingDirectory is
+        required and the service runs `pnpm ingest --prod` there.
       '';
     };
 
@@ -75,9 +76,9 @@ in
         WorkingDirectory = lib.mkIf (cfg.workingDirectory != null) cfg.workingDirectory;
         ExecStart =
           if cfg.package != null then
-            "${cfg.package}/bin/conference-tools ingest"
+            "${cfg.package}/bin/conference-tools ingest --prod"
           else
-            "${lib.getExe pkgs.pnpm} ingest";
+            "${lib.getExe pkgs.pnpm} ingest --prod";
       };
     };
 

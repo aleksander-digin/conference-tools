@@ -15,3 +15,13 @@ _Avoid_: participant, guest, registrant
 **Processed mailbox**:
 The IMAP folder automailer moves a submission to after it sends the confirmation letter. This project reads that folder; it does not move mail.
 _Avoid_: inbox (unprocessed mail that automailer still owns)
+
+```mermaid
+flowchart LR
+  imap[Zoho Processed folder]
+  live[submissions]
+  test[submissions_test]
+  imap --> ingest
+  ingest -->|"flake / pnpm ingest"| test
+  ingest -->|"NixOS or GitHub Actions --prod"| live
+```

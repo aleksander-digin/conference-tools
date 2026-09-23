@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import { config as loadEnv } from "dotenv";
 import { Command } from "commander";
-import { loadDatabaseUrl, loadTestDatabaseUrl } from "./config.ts";
+import { loadDatabaseUrl } from "./config.ts";
 import { connectImap, loadImapConfig } from "./inbox.ts";
 import { ingestProcessed } from "./pipeline.ts";
-import { openStore } from "./store.ts";
+import { openStore, STORE_TABLES } from "./store.ts";
 
 loadEnv({ quiet: true });
 
@@ -17,21 +17,19 @@ program
 program
   .command("ingest")
   .description("Fetch Squarespace form mail from the Processed IMAP folder and upsert into MySQL")
-  .option("--database <url>", "mysql:// URL (default DATABASE_URL, the hosted database)")
-  .option("--local", "Write to the local test database (TEST_DATABASE_URL)")
+  .option("--database <url>", "mysql:// URL (default DATABASE_URL)")
+  .option("--prod", "Write to submissions (NixOS / GitHub Actions). Default is submissions_test.")
   .action(async (opts: Record<string, unknown>) => {
-    const dbUrl =
-      opts.database !== undefined
-        ? String(opts.database)
-        : opts.local === true
-          ? loadTestDatabaseUrl()
-          : loadDatabaseUrl();
-    const store = await openStore(dbUrl);
+    const dbUrl = opts.database !== undefined ? String(opts.database) : loadDatabaseUrl();
+    const table = opts.prod === true ? STORE_TABLES.live : STORE_TABLES.test;
+    const store = await openStore(dbUrl, { table });
     try {
       const mailbox = await connectImap(loadImapConfig());
       try {
         const summary = await ingestProcessed({ inbox: mailbox, store });
-        console.log(`ingested ${summary.ingested}, skipped ${summary.skipped}, failed ${summary.failed}`);
+        console.log(
+          `${store.table}: ingested ${summary.ingested}, skipped ${summary.skipped}, failed ${summary.failed}`,
+        );
       } finally {
         await mailbox.close();
       }

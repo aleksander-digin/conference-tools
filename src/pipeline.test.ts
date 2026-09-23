@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { Inbox, InboxMessage } from "./inbox.ts";
 import { ingestProcessed } from "./pipeline.ts";
 import type { SquarespaceSubmission } from "./squarespace.ts";
-import type { StoredSubmission, SubmissionStore, UpsertResult } from "./store.ts";
+import { STORE_TABLES, type StoredSubmission, type SubmissionStore, type UpsertResult } from "./store.ts";
 import { SQUARESPACE_SUBMISSION_SOURCE } from "./fixtures/squarespace-submission.ts";
 
 const sample = SQUARESPACE_SUBMISSION_SOURCE;
@@ -20,6 +20,7 @@ function memoryStore(): SubmissionStore & { rows: Map<string, StoredSubmission> 
   const rows = new Map<string, StoredSubmission>();
   let nextId = 1;
   return {
+    table: STORE_TABLES.test,
     rows,
     async upsert(sub: SquarespaceSubmission): Promise<UpsertResult> {
       const existing = rows.get(sub.messageId);
