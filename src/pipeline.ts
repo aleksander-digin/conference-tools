@@ -26,9 +26,8 @@ export async function ingestProcessed(deps: PipelineDeps): Promise<PipelineSumma
       const result = await deps.store.upsert(sub);
       if (result.inserted) summary.ingested += 1;
       else summary.skipped += 1;
-    } catch (err) {
+    } catch {
       summary.failed += 1;
-      console.error(`imap uid ${message.uid}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

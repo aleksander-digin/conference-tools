@@ -108,3 +108,20 @@ test("ingestProcessed counts unreadable mail as failed and does not store it", a
   assert.equal(summary.failed, 1);
   assert.equal(store.rows.size, 0);
 });
+
+test("ingestProcessed does not log submission data from store errors", async (t) => {
+  const store = memoryStore();
+  store.upsert = async () => {
+    throw new Error("attendee@example.com has a private dietary requirement");
+  };
+  const logged: string[] = [];
+  t.mock.method(console, "error", (...parts: unknown[]) => logged.push(parts.join(" ")));
+
+  const summary = await ingestProcessed({
+    inbox: memoryInbox([{ uid: "1", source: sample }]),
+    store,
+  });
+
+  assert.equal(summary.failed, 1);
+  assert.deepEqual(logged, []);
+});

@@ -37,6 +37,7 @@ program
         console.log(
           `${store.table}: ingested ${summary.ingested}, skipped ${summary.skipped}, failed ${summary.failed}`,
         );
+        if (summary.failed > 0) process.exitCode = 1;
       } finally {
         await mailbox.close();
       }
@@ -45,4 +46,9 @@ program
     }
   });
 
-await program.parseAsync();
+try {
+  await program.parseAsync();
+} catch {
+  console.error("ingest failed; check mailbox and database connectivity");
+  process.exitCode = 1;
+}
