@@ -12,6 +12,14 @@ export type OpenStoreOpts = {
   table?: StoreTable;
 };
 
+/** Require certificate-validated TLS for every database connection. */
+export function databaseConnectionOptions(url: string): mysql.PoolOptions {
+  if (!url.startsWith("mysql://") && !url.startsWith("mysql2://")) {
+    throw new Error("store: DATABASE_URL must be a mysql:// URL");
+  }
+  return { uri: url, ssl: { rejectUnauthorized: true } };
+}
+
 export type StoredSubmission = {
   id: number;
   messageId: string;
@@ -79,11 +87,8 @@ CREATE TABLE IF NOT EXISTS ${table} (
 }
 
 export async function openStore(url: string, opts: OpenStoreOpts = {}): Promise<SubmissionStore> {
-  if (!url.startsWith("mysql://") && !url.startsWith("mysql2://")) {
-    throw new Error("store: DATABASE_URL must be a mysql:// URL");
-  }
   const table = opts.table ?? STORE_TABLES.live;
-  const pool = mysql.createPool(url);
+  const pool = mysql.createPool(databaseConnectionOptions(url));
   try {
     await pool.query(schema(table));
     await migrateFieldColumns(pool, table);

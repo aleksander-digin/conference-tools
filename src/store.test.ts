@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { config as loadEnv } from "dotenv";
 import mysql from "mysql2/promise";
 import { loadDatabaseUrl } from "./config.ts";
-import { openStore, STORE_TABLES } from "./store.ts";
+import { databaseConnectionOptions, openStore, STORE_TABLES } from "./store.ts";
 import type { SquarespaceSubmission } from "./squarespace.ts";
 
 loadEnv({ quiet: true });
@@ -50,7 +50,7 @@ async function withStore(run: (store: Awaited<ReturnType<typeof openStore>>) => 
   try {
     await run(store);
   } finally {
-    const conn = await mysql.createConnection(dbUrl);
+    const conn = await mysql.createConnection(databaseConnectionOptions(dbUrl));
     try {
       await conn.query(`DELETE FROM ${STORE_TABLES.test} WHERE message_id LIKE ?`, ["<store-test-%"]);
     } finally {
@@ -62,6 +62,21 @@ async function withStore(run: (store: Awaited<ReturnType<typeof openStore>>) => 
 
 test("openStore rejects non-mysql URLs", async () => {
   await assert.rejects(() => openStore("sqlite:data/inbox.sqlite"), /mysql:\/\//);
+});
+
+test("database connections negotiate TLS", async (t) => {
+  let ran = false;
+  await withStore(async () => {
+    ran = true;
+    const conn = await mysql.createConnection(databaseConnectionOptions(databaseUrl()!));
+    try {
+      const [rows] = await conn.query<mysql.RowDataPacket[]>("SHOW SESSION STATUS LIKE 'Ssl_cipher'");
+      assert.ok(rows[0]?.Value, "database connection must use a TLS cipher");
+    } finally {
+      await conn.end();
+    }
+  });
+  if (!ran) t.skip("DATABASE_URL is not set or the hosted MySQL is unreachable");
 });
 
 test("store inserts a submission into submissions_test", async (t) => {
@@ -80,7 +95,7 @@ test("store inserts a submission into submissions_test", async (t) => {
     assert.equal(row.submission.receivedAt, sample.receivedAt);
     const got = await store.get(sample.messageId);
     assert.equal(got?.name, "Aleksander Bang-Larsen");
-    const conn = await mysql.createConnection(databaseUrl()!);
+    const conn = await mysql.createConnection(databaseConnectionOptions(databaseUrl()!));
     try {
       const [rows] = await conn.query<mysql.RowDataPacket[]>(
         `SELECT first_name, last_name, organisation, dietary_requirements, accepts_marketing, fields FROM ${STORE_TABLES.test} WHERE message_id = ?`,
@@ -105,7 +120,7 @@ test("store backfills field columns from JSON for existing submissions", async (
   await withStore(async (store) => {
     ran = true;
     await store.upsert(sample);
-    const conn = await mysql.createConnection(databaseUrl()!);
+    const conn = await mysql.createConnection(databaseConnectionOptions(databaseUrl()!));
     try {
       await conn.query(
         `UPDATE ${STORE_TABLES.test} SET first_name = NULL, last_name = NULL, organisation = NULL, dietary_requirements = NULL, accepts_marketing = NULL WHERE message_id = ?`,
