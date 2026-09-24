@@ -18,6 +18,11 @@ export type StoredSubmission = {
   formName: string;
   email: string;
   name: string;
+  firstName: string | null;
+  lastName: string | null;
+  organisation: string | null;
+  dietaryRequirements: string | null;
+  acceptsMarketing: string | null;
   fields: Record<string, string>;
   receivedAt: string;
   ingestedAt: string;
@@ -41,6 +46,11 @@ type Row = {
   form_name: string;
   email: string;
   name: string;
+  first_name: string | null;
+  last_name: string | null;
+  organisation: string | null;
+  dietary_requirements: string | null;
+  accepts_marketing: string | null;
   fields: string | Record<string, string>;
   received_at: string;
   ingested_at: string;
@@ -54,6 +64,11 @@ CREATE TABLE IF NOT EXISTS ${table} (
   form_name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
   name VARCHAR(255) NOT NULL,
+  first_name TEXT NULL,
+  last_name TEXT NULL,
+  organisation TEXT NULL,
+  dietary_requirements TEXT NULL,
+  accepts_marketing TEXT NULL,
   fields JSON NOT NULL,
   received_at VARCHAR(32) NOT NULL,
   ingested_at VARCHAR(32) NOT NULL,
@@ -69,8 +84,35 @@ export async function openStore(url: string, opts: OpenStoreOpts = {}): Promise<
   }
   const table = opts.table ?? STORE_TABLES.live;
   const pool = mysql.createPool(url);
-  await pool.query(schema(table));
+  try {
+    await pool.query(schema(table));
+    await migrateFieldColumns(pool, table);
+  } catch (error) {
+    await pool.end();
+    throw error;
+  }
   return mysqlStore(pool, table);
+}
+
+const FIELD_COLUMNS = [
+  "first_name",
+  "last_name",
+  "organisation",
+  "dietary_requirements",
+  "accepts_marketing",
+] as const;
+
+async function migrateFieldColumns(pool: mysql.Pool, table: StoreTable): Promise<void> {
+  const [rows] = await pool.query<mysql.RowDataPacket[]>(`SHOW COLUMNS FROM ${table}`);
+  const existing = new Set(rows.map((row) => String(row.Field)));
+  for (const column of FIELD_COLUMNS) {
+    if (!existing.has(column)) {
+      await pool.query(`ALTER TABLE ${table} ADD COLUMN ${column} TEXT NULL`);
+    }
+    await pool.query(
+      `UPDATE ${table} SET ${column} = JSON_UNQUOTE(JSON_EXTRACT(fields, '$.${column}')) WHERE ${column} IS NULL AND JSON_CONTAINS_PATH(fields, 'one', '$.${column}')`,
+    );
+  }
 }
 
 function mysqlStore(pool: mysql.Pool, table: StoreTable): SubmissionStore {
@@ -81,14 +123,19 @@ function mysqlStore(pool: mysql.Pool, table: StoreTable): SubmissionStore {
       const [result] = await pool.query<mysql.ResultSetHeader>(
         `
         INSERT IGNORE INTO ${table}
-          (message_id, form_name, email, name, fields, received_at, ingested_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+          (message_id, form_name, email, name, first_name, last_name, organisation, dietary_requirements, accepts_marketing, fields, received_at, ingested_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
           sub.messageId,
           sub.formName,
           sub.email,
           sub.name,
+          sub.fields.first_name ?? null,
+          sub.fields.last_name ?? null,
+          sub.fields.organisation ?? null,
+          sub.fields.dietary_requirements ?? null,
+          sub.fields.accepts_marketing ?? null,
           JSON.stringify(sub.fields),
           sub.receivedAt,
           ingestedAt,
@@ -127,6 +174,11 @@ function mapRow(row: Row): StoredSubmission {
     formName: row.form_name,
     email: row.email,
     name: row.name,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    organisation: row.organisation,
+    dietaryRequirements: row.dietary_requirements,
+    acceptsMarketing: row.accepts_marketing,
     fields: parseFields(row.fields),
     receivedAt: row.received_at,
     ingestedAt: row.ingested_at,
