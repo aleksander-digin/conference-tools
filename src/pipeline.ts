@@ -1,8 +1,8 @@
 import type { Inbox } from "./inbox.ts";
-import { parseSquarespaceSubmission } from "./squarespace.ts";
+import { parseSquarespaceSubmission, type TestIngestOptions } from "./squarespace.ts";
 import type { SubmissionStore } from "./store.ts";
 
-export type PipelineDeps = {
+export type PipelineDeps = TestIngestOptions & {
   inbox: Inbox;
   store: SubmissionStore;
 };
@@ -19,7 +19,10 @@ export async function ingestProcessed(deps: PipelineDeps): Promise<PipelineSumma
 
   for (const message of messages) {
     try {
-      const sub = await parseSquarespaceSubmission(message.source);
+      const sub = await parseSquarespaceSubmission(message.source, {
+        allowOtherSenders: deps.allowOtherSenders,
+        allowForwardedSubject: deps.allowForwardedSubject,
+      });
       const result = await deps.store.upsert(sub);
       if (result.inserted) summary.ingested += 1;
       else summary.skipped += 1;

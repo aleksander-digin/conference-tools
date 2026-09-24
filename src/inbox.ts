@@ -1,5 +1,5 @@
 import { ImapFlow } from "imapflow";
-import { SQUARESPACE_FROM } from "./squarespace.ts";
+import { SQUARESPACE_FROM, SUBJECT_PREFIX, type TestIngestOptions } from "./squarespace.ts";
 
 export type InboxMessage = {
   uid: string;
@@ -19,8 +19,10 @@ export type ImapConfig = {
   folder: string;
 };
 
-export function inboxSearchQuery() {
-  return { from: SQUARESPACE_FROM };
+export function inboxSearchQuery(options: TestIngestOptions = {}) {
+  return options.allowOtherSenders
+    ? { subject: SUBJECT_PREFIX }
+    : { from: SQUARESPACE_FROM };
 }
 
 function env(name: string): string | undefined {
@@ -30,7 +32,10 @@ function env(name: string): string | undefined {
 
 export type ConnectedInbox = Inbox & { close(): Promise<void> };
 
-export async function connectImap(config: ImapConfig): Promise<ConnectedInbox> {
+export async function connectImap(
+  config: ImapConfig,
+  options: TestIngestOptions = {},
+): Promise<ConnectedInbox> {
   const client = new ImapFlow({
     host: config.host,
     port: config.port,
@@ -43,7 +48,7 @@ export async function connectImap(config: ImapConfig): Promise<ConnectedInbox> {
 
   return {
     async fetchSquarespace() {
-      const uids = await client.search(inboxSearchQuery(), { uid: true });
+      const uids = await client.search(inboxSearchQuery(options), { uid: true });
       if (!uids || uids.length === 0) return [];
       const fetched = await client.fetchAll(
         uids,
@@ -53,7 +58,7 @@ export async function connectImap(config: ImapConfig): Promise<ConnectedInbox> {
       const messages: InboxMessage[] = [];
       for (const msg of fetched) {
         const from = msg.envelope?.from?.[0]?.address?.toLowerCase() ?? "";
-        if (from !== SQUARESPACE_FROM) continue;
+        if (!options.allowOtherSenders && from !== SQUARESPACE_FROM) continue;
         if (!msg.source) continue;
         messages.push({ uid: String(msg.uid), source: Buffer.from(msg.source) });
       }

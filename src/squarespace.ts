@@ -1,7 +1,7 @@
 import { simpleParser } from "mailparser";
 
 export const SQUARESPACE_FROM = "form-submission@squarespace.info";
-const SUBJECT_PREFIX = "Form Submission - ";
+export const SUBJECT_PREFIX = "Form Submission - ";
 const EMAIL_MARKETING = /,\s*accepts marketing:\s*(true|false)\s*$/i;
 const FIELD_PAIR = /<b>([^<]+):<\/b>\s*<span>(.*?)<\/span>/gi;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -15,18 +15,29 @@ export type SquarespaceSubmission = {
   fields: Record<string, string>;
 };
 
-export async function parseSquarespaceSubmission(source: Buffer): Promise<SquarespaceSubmission> {
+export type TestIngestOptions = {
+  allowOtherSenders?: boolean;
+  allowForwardedSubject?: boolean;
+};
+
+export async function parseSquarespaceSubmission(
+  source: Buffer,
+  options: TestIngestOptions = {},
+): Promise<SquarespaceSubmission> {
   const mail = await simpleParser(source);
   const from = addressOf(mail.from);
-  if (from !== SQUARESPACE_FROM) {
+  if (!options.allowOtherSenders && from !== SQUARESPACE_FROM) {
     throw new Error("not a Squarespace form submission");
   }
 
   const subject = (mail.subject ?? "").trim();
-  if (!subject.startsWith(SUBJECT_PREFIX)) {
+  const formSubject = options.allowForwardedSubject
+    ? subject.replace(/^(?:(?:fwd|fw):\s*)+/i, "")
+    : subject;
+  if (!formSubject.startsWith(SUBJECT_PREFIX)) {
     throw new Error("not a Squarespace form submission");
   }
-  const formName = subject.slice(SUBJECT_PREFIX.length).trim();
+  const formName = formSubject.slice(SUBJECT_PREFIX.length).trim();
   if (!formName) throw new Error("squarespace: missing form name in subject");
 
   const messageId = mail.messageId?.trim();

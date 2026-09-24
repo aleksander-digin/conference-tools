@@ -65,6 +65,22 @@ test("ingestProcessed stores a Squarespace submission", async () => {
   assert.equal(row?.fields.dietary_requirements, "nej");
 });
 
+test("test ingest stores a forwarded form from another sender", async () => {
+  const store = memoryStore();
+  const source = Buffer.from(sample.toString()
+    .replace('From: "Squarespace" <form-submission@squarespace.info>', "From: Test Sender <someone@example.com>")
+    .replace("Reply-To: <aleksander@dig-in.dk>\r\n", "")
+    .replace("Subject: Form Submission - ", "Subject: Fwd: Form Submission - "));
+  const summary = await ingestProcessed({
+    inbox: memoryInbox([{ uid: "2", source }]),
+    store,
+    allowOtherSenders: true,
+    allowForwardedSubject: true,
+  });
+  assert.equal(summary.ingested, 1);
+  assert.equal(store.rows.size, 1);
+});
+
 test("ingestProcessed skips a Message-ID that is already stored", async () => {
   const store = memoryStore();
   const inbox = memoryInbox([{ uid: "1", source: sample }]);

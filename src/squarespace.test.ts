@@ -40,3 +40,27 @@ test("parseSquarespaceSubmission rejects mail that is not from Squarespace", asy
   ].join("\r\n");
   await assert.rejects(() => parseSquarespaceSubmission(Buffer.from(source)), /not a Squarespace form submission/);
 });
+
+test("parseSquarespaceSubmission accepts another sender only when requested", async () => {
+  const source = Buffer.from(sample.toString().replace(
+    'From: "Squarespace" <form-submission@squarespace.info>',
+    "From: Test Sender <someone@example.com>",
+  ));
+  await assert.rejects(() => parseSquarespaceSubmission(source), /not a Squarespace form submission/);
+  const sub = await parseSquarespaceSubmission(source, { allowOtherSenders: true });
+  assert.equal(sub.email, "aleksander@dig-in.dk");
+});
+
+test("parseSquarespaceSubmission reads a forwarded form only in test mode", async () => {
+  const source = Buffer.from(sample.toString()
+    .replace('From: "Squarespace" <form-submission@squarespace.info>', "From: Test Sender <someone@example.com>")
+    .replace("Reply-To: <aleksander@dig-in.dk>\r\n", "")
+    .replace("Subject: Form Submission - ", "Subject: Fwd: Form Submission - "));
+  await assert.rejects(() => parseSquarespaceSubmission(source), /not a Squarespace form submission/);
+  const sub = await parseSquarespaceSubmission(source, {
+    allowOtherSenders: true,
+    allowForwardedSubject: true,
+  });
+  assert.equal(sub.email, "aleksander@dig-in.dk");
+  assert.equal(sub.formName, "Tilmelding Northern Clouds konference Form");
+});

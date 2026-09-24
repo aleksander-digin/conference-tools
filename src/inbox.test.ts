@@ -48,6 +48,12 @@ test("inboxSearchQuery finds Squarespace mail without requiring unseen", () => {
   assert.deepEqual(inboxSearchQuery(), { from: SQUARESPACE_FROM });
 });
 
+test("inboxSearchQuery can find form mail from another sender for test ingest", () => {
+  assert.deepEqual(inboxSearchQuery({ allowOtherSenders: true }), {
+    subject: "Form Submission - ",
+  });
+});
+
 function restore(prev: Record<string, string | undefined>): void {
   for (const [key, value] of Object.entries(prev)) {
     if (value === undefined) delete process.env[key];
